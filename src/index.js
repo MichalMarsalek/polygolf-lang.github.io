@@ -131,13 +131,9 @@ function generate() {
   const source = getSource();
 
   const options = {
-    level: 'full',
     objective: getObjective(),
     getAllVariants: getIsAllVariants(),
-    codepointRange: [1, Infinity],
-    restrictFrontend: true,
-    skipTypecheck: false,
-    skipPlugins: []
+    caller: 'playground',
   };
 
   const languageName = getLanguageName();
