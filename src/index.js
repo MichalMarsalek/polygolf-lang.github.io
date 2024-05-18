@@ -7,18 +7,27 @@ const urlDictionaries = [
   ["println"]
 ]
 
+function escapeUsingDictionary(x){
+  return x
+}
+function unescapeUsingDictionary(x){
+  return x
+}
+
 function base64Encode(bytes){
-  return btoa(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 function base64Decode(str){
   const base64Encoded = str.replace(/-/g, '+').replace(/_/g, '/');
   const padding = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
   const base64WithPadding = base64Encoded + padding;
-  return [...atob(base64WithPadding)]
+  return [...atob(base64WithPadding)].map(x => x.charCodeAt(0))
 }
 
 function urlEncode(){
-  return [urlEncode0, urlEncode1].map(encoder => encoder()).reduce((a,b) => a.length < b.length ? a : b);
+  const encodings = [urlEncode0, urlEncode1].map(encoder => encoder());
+  console.log({encodings})
+  return encodings.reduce((a,b) => a.length < b.length ? a : b);
 }
 
 function urlEncode0(){
@@ -29,7 +38,7 @@ function urlEncode1(){
   const isChars = getObjective() === "chars";
   const isAllVariants = getIsAllVariants();
   const compile = true;
-  const bytes = [1, langBytes.length << 4 ^ isChars << 3 ^ isAllVariants << 2 ^ compile << 1, ...langBytes, ...langBytes,new TextEncoder().encode(escapeUsingDictionary(getSource(),1))];
+  const bytes = [1, langBytes.length << 4 ^ isChars << 3 ^ isAllVariants << 2 ^ compile << 1, ...langBytes,...new TextEncoder().encode(escapeUsingDictionary(getSource(),1))];
   return `#${base64Encode(bytes)}`;
 }
 
@@ -53,8 +62,8 @@ function urlDecode1(){
     const getAllVariants = bytes[1] >> 2 & 1;
     const objective = bytes[1] >> 3 & 1;
     const langLength = bytes[1] >> 4;
-    const language = new TextDecoder().decode(bytes.slice(1,1+langLength));
-    const source = unescapeUsingDictionary(new TextDecoder().decode(bytes.slice(1+langLength)),1);
+    const language = new TextDecoder().decode(new Uint8Array(bytes.slice(2,2+langLength)));
+    const source = unescapeUsingDictionary(new TextDecoder().decode(new Uint8Array(bytes.slice(2+langLength))),1);
     return new URLSearchParams({
       source,
       language,
@@ -77,7 +86,7 @@ window.onload = () => {
 
   function configureSource() {
     const parent = document.getElementById('sourceDiv');
-    const value = urlParams.get("source") ?? localStorage.getItem('source') ?? getFibonacci();
+    const value = urlParams?.get("source") ?? localStorage.getItem('source') ?? getFibonacci();
     const onChange = (newText) => {
       localStorage.setItem('source', newText);
     };
@@ -86,7 +95,7 @@ window.onload = () => {
 
   function configureSelect(selectName) {
     const select = document.getElementById(selectName + 'Select');
-    const value = urlParams.get(selectName) ?? localStorage.getItem(selectName);
+    const value = urlParams?.get(selectName) ?? localStorage.getItem(selectName);
     if (value !== null) {
       select.value = value;
     }
@@ -97,7 +106,7 @@ window.onload = () => {
 
   function configureCheckBox(checkBoxName) {
     const checkBox = document.getElementById(checkBoxName + 'CheckBox');
-    const value = urlParams.get(checkBoxName) ?? localStorage.getItem(checkBoxName);
+    const value = urlParams?.get(checkBoxName) ?? localStorage.getItem(checkBoxName);
     if (value !== null) {
       checkBox.checked = value === 'true';
     }
@@ -148,7 +157,7 @@ window.onload = () => {
 
     configureSelect('language');
 
-    if (urlParams.get('compile') === 'true') {
+    if (urlParams?.get('compile') === 'true') {
       generate();
     }
 
