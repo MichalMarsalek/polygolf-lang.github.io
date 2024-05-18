@@ -2,13 +2,76 @@ let worker;
 let languages;
 let editor;
 
+const urlDictionaries = [
+  [],
+  ["println"]
+]
+
+function base64Encode(bytes){
+  return btoa(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function base64Decode(str){
+  const base64Encoded = str.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
+  const base64WithPadding = base64Encoded + padding;
+  return [...atob(base64WithPadding)]
+}
+
+function urlEncode(){
+  return [urlEncode0, urlEncode1].map(encoder => encoder()).reduce((a,b) => a.length < b.length ? a : b);
+}
+
+function urlEncode0(){
+  return `?source=${encodeURIComponent(getSource())}&language=${getLanguageName()}&objective=${getObjective()}&getAllVariants=${getIsAllVariants()}&compile=true`;
+}
+function urlEncode1(){
+  const langBytes = new TextEncoder().encode(getLanguageName());
+  const isChars = getObjective() === "chars";
+  const isAllVariants = getIsAllVariants();
+  const compile = true;
+  const bytes = [1, langBytes.length << 4 ^ isChars << 3 ^ isAllVariants << 2 ^ compile << 1, ...langBytes, ...langBytes,new TextEncoder().encode(escapeUsingDictionary(getSource(),1))];
+  return `#${base64Encode(bytes)}`;
+}
+
+function urlDecode(){
+  for(const decoder of [urlDecode0, urlDecode1]){
+    const decoded = decoder()
+    if (decoded !== undefined){
+      return decoded
+    }
+  }
+}
+
+function urlDecode0(){
+  const res = new URLSearchParams(window.location.search);
+  return res.size === 0 ? undefined : res;
+}
+function urlDecode1(){
+  const bytes = window.location.hash ? base64Decode(window.location.hash.slice(1)) : [];
+  if (bytes[0] === 1){
+    const compile = bytes[1] >> 1 & 1;
+    const getAllVariants = bytes[1] >> 2 & 1;
+    const objective = bytes[1] >> 3 & 1;
+    const langLength = bytes[1] >> 4;
+    const language = new TextDecoder().decode(bytes.slice(1,1+langLength));
+    const source = unescapeUsingDictionary(new TextDecoder().decode(bytes.slice(1+langLength)),1);
+    return new URLSearchParams({
+      source,
+      language,
+      objective: objective >> 3 & 1 ? "chars" : "bytes",
+      getAllVariants: getAllVariants ? "true" : null,
+      compile: compile ? "true" : null
+    })
+  }
+}
+
 window.onload = () => {
   window.onkeydown = e => (e.ctrlKey || e.metaKey) && e.key == 'Enter'
     ? generate()
     : undefined;
 
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.size !== 0) {
+  const urlParams = urlDecode();
+  if (urlParams !== undefined) {
     history.replaceState({}, null, window.location.origin + window.location.pathname);
   }
 
@@ -263,7 +326,7 @@ function groupBy(sequence, keyFn) {
 }
 
 function copyLink() {
-  navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?source=${encodeURIComponent(getSource())}&language=${getLanguageName()}&objective=${getObjective()}&getAllVariants=${getIsAllVariants()}&compile=true`);
+  navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}${urlEncode()}`);
 }
 
 function download() {
